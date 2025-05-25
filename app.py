@@ -1,5 +1,5 @@
 # app.py
-from flask import Flask, jsonify, request, send_from_directory  # ✅ CHANGED LINE 2
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
@@ -9,37 +9,36 @@ from auth import auth_bp
 from sqlalchemy import and_
 from models import Product
 import json
-import os  # ✅ NEW IMPORT
+import os
 
-app = Flask(__name__, static_folder='build', static_url_path='/')  # ✅ CHANGED to serve React build
+app = Flask(__name__, static_folder='build', static_url_path='/')
 CORS(app)
 
-# Database Config
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///store.db'
+# ✅ Use PostgreSQL from Render env variable
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
 db.init_app(app)
 migrate = Migrate(app, db)
 
-# Create tables
-with app.app_context():
-    db.create_all()
+# ⚠️ Optional: Only use create_all() if NOT using Flask-Migrate
+# with app.app_context():
+#     db.create_all()
 
-# 🔁 REPLACED old "/" route with React frontend index.html
-@app.route('/', defaults={'path': ''})  # ✅ NEW
-@app.route('/<path:path>')             # ✅ NEW
+# ✅ Serve React frontend
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
 def serve_react(path):
     if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
         return send_from_directory(app.static_folder, path)
     else:
         return send_from_directory(app.static_folder, 'index.html')
 
-# You can test this route to confirm API is still working
+# API Routes
 @app.route('/tables')
 def show_tables():
     inspector = db.inspect(db.engine)
     return {'tables': inspector.get_table_names()}
-
-# --- All other API routes remain the same ---
 
 @app.route('/api/products', methods=['GET'])
 def get_products():
@@ -116,20 +115,12 @@ def delete_product(id):
     db.session.commit()
     return jsonify({"message": "Product deleted"})
 
+# Register blueprints
 app.register_blueprint(orders_bp)
 app.register_blueprint(auth_bp)
 
+# ✅ Run the server
 if __name__ == "__main__":
-    import os
     port = int(os.environ.get("PORT", 5000))
     app.run(debug=False, host="0.0.0.0", port=port)
 
-from flask import send_from_directory
-
-@app.route('/', defaults={'path': ''})
-@app.route('/<path:path>')
-def serve(path):
-    if path != "" and os.path.exists(os.path.join("build", path)):
-        return send_from_directory("build", path)
-    else:
-        return send_from_directory("build", "index.html")
